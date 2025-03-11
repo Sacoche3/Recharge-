@@ -3,310 +3,401 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Approbation des Retraits</title>
+    <title>Gestion des Soldes Utilisateurs</title>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/firebase/10.9.0/firebase-app-compat.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/firebase/10.9.0/firebase-database-compat.min.js"></script>
     <style>
-        .debug-info {
-            background: #fff3cd;
-            padding: 10px;
-            margin: 10px 0;
-            border-radius: 4px;
-            font-family: monospace;
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
         }
-        .retrait {
-            border: 1px solid #ddd;
-            margin: 10px 0;
-            padding: 15px;
+
+        body {
+            font-family: Arial, sans-serif;
+            line-height: 1.6;
+            padding: 20px;
+            background-color: #f5f5f5;
+        }
+
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+            background-color: white;
+            padding: 20px;
             border-radius: 8px;
+            box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
         }
-        .info-user {
-            display: flex;
-            justify-content: space-between;
-            margin-bottom: 10px;
-        }
-        .en-attente {
-            color: orange;
-        }
-        .montant {
-            font-size: 1.2em;
-            font-weight: bold;
-            margin: 10px 0;
-        }
-        .details {
-            margin: 10px 0;
-        }
-        .detail {
-            margin: 5px 0;
-        }
-        .boutons {
-            display: flex;
-            gap: 10px;
-        }
-        .btn {
-            padding: 8px 16px;
-            border: none;
-            border-radius: 4px;
-            cursor: pointer;
-        }
-        .btn-approuver {
-            background: #28a745;
-            color: white;
-        }
-        .btn-rejeter {
-            background: #dc3545;
-            color: white;
-        }
-        .filtres {
-            background: #f8f9fa;
-            padding: 15px;
-            margin: 15px 0;
-            border-radius: 8px;
-            display: flex;
-            gap: 15px;
-            align-items: center;
-            flex-wrap: wrap;
-        }
-        .filtre-groupe {
-            display: flex;
-            flex-direction: column;
-            gap: 5px;
-        }
-        .filtre-groupe label {
-            font-weight: bold;
-            font-size: 0.9em;
-        }
-        input[type="date"] {
-            padding: 8px;
-            border: 1px solid #ddd;
-            border-radius: 4px;
-        }
-        .btn-filtre {
-            background: #0d6efd;
-            color: white;
-            height: fit-content;
-            align-self: flex-end;
-        }
-        .stats {
-            background: #e9ecef;
-            padding: 15px;
-            margin: 15px 0;
-            border-radius: 8px;
-            display: flex;
-            gap: 20px;
-        }
-        .stat-item {
-            flex: 1;
+
+        h1 {
+            color: #333;
+            margin-bottom: 30px;
             text-align: center;
         }
-        .stat-valeur {
-            font-size: 1.5em;
-            font-weight: bold;
-            color: #0d6efd;
+
+        h3 {
+            color: #444;
+            margin-bottom: 15px;
         }
-        .stat-label {
-            font-size: 0.9em;
-            color: #6c757d;
+
+        .search-form {
+            margin-bottom: 30px;
+        }
+
+        .search-form input {
+            width: 100%;
+            padding: 10px;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+            font-size: 16px;
+        }
+
+        .edit-form {
+            background-color: #f8f9fa;
+            padding: 20px;
+            border-radius: 4px;
+            margin-bottom: 30px;
+        }
+
+        input, button {
+            padding: 10px;
+            margin: 5px;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+        }
+
+        button {
+            background-color: #007bff;
+            color: white;
+            border: none;
+            cursor: pointer;
+            transition: background-color 0.3s;
+        }
+
+        button:hover {
+            background-color: #0056b3;
+        }
+
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            margin-top: 20px;
+        }
+
+        th, td {
+            padding: 12px;
+            text-align: left;
+            border-bottom: 1px solid #ddd;
+        }
+
+        th {
+            background-color: #f8f9fa;
+            font-weight: bold;
+        }
+
+        .disabled-user {
+            background-color: #f8d7da;
+            color: #721c24;
+        }
+
+        #message {
+            margin: 10px 0;
+            padding: 10px;
+            border-radius: 4px;
+        }
+
+        .error {
+            background-color: #f8d7da;
+            color: #721c24;
+            padding: 10px;
+            border-radius: 4px;
+        }
+
+        .success {
+            background-color: #d4edda;
+            color: #155724;
+            padding: 10px;
+            border-radius: 4px;
         }
     </style>
 </head>
 <body>
-    <div class="header">
-        <h1>Demandes de Retrait</h1>
+    <div class="container">
+        <h1>Gestion des Soldes Utilisateurs</h1>
+        
+        <div class="search-form">
+            <input type="text" id="searchInput" placeholder="Rechercher par email" onkeyup="filterUsers()">
+        </div>
+
+        <div class="edit-form">
+            <h3>Modifier le solde</h3>
+            <input type="text" id="userIdInput" placeholder="Email Utilisateur">
+            <input type="number" id="balanceInput" placeholder="Nouveau solde">
+            <button onclick="updateBalance()">Mettre à jour</button>
+            <button onclick="toggleUserStatus()" style="background-color: #dc3545;">Désactiver/Activer</button>
+        </div>
+
+        <div id="message"></div>
+        
+        <table>
+            <thead>
+                <tr>
+                    <th>Email</th>
+                    <th>Solde</th>
+                    <th>Statut</th>
+                    <th>Actions</th>
+                </tr>
+            </thead>
+            <tbody id="userTable">
+                <!-- Les utilisateurs seront ajoutés ici -->
+            </tbody>
+        </table>
     </div>
 
-    <div class="filtres">
-        <div class="filtre-groupe">
-            <label>Date de début</label>
-            <input type="date" id="date-debut" onchange="filtrerRetraits()">
-        </div>
-        <div class="filtre-groupe">
-            <label>Date de fin</label>
-            <input type="date" id="date-fin" onchange="filtrerRetraits()">
-        </div>
-        <button class="btn btn-filtre" onclick="reinitialiserFiltres()">
-            Réinitialiser les filtres
-        </button>
-    </div>
+<script type="module">
+    // Import des modules Firebase
+    import { initializeApp } from "https://www.gstatic.com/firebasejs/9.22.1/firebase-app.js";
+    import { 
+        getAuth, 
+        createUserWithEmailAndPassword, 
+        signInWithEmailAndPassword 
+    } from "https://www.gstatic.com/firebasejs/9.22.1/firebase-auth.js";
+    import { 
+        getDatabase, 
+        ref, 
+        set, 
+        get, 
+        child, 
+        onValue, 
+        query, 
+        orderByChild, 
+        equalTo, 
+        update 
+    } from "https://www.gstatic.com/firebasejs/9.22.1/firebase-database.js";
 
-    <div class="stats">
-        <div class="stat-item">
-            <div class="stat-valeur" id="total-retraits">0</div>
-            <div class="stat-label">Total des retraits</div>
-        </div>
-        <div class="stat-item">
-            <div class="stat-valeur" id="montant-total">0 €</div>
-            <div class="stat-label">Montant total</div>
-        </div>
-        <div class="stat-item">
-            <div class="stat-valeur" id="retraits-periode">0</div>
-            <div class="stat-label">Retraits sur la période</div>
-        </div>
-    </div>
+    // Configuration Firebase
+    const firebaseConfig = {
+        apiKey: "AIzaSyCekNaQs88vn7Ed2IIO_fIrc3kk2lVfggM",
+        authDomain: "uber-10bff.firebaseapp.com",
+        databaseURL: "https://uber-10bff-default-rtdb.firebaseio.com",
+        projectId: "uber-10bff",
+        storageBucket: "uber-10bff.firebasestorage.app",
+        messagingSenderId: "997089945771",
+        appId: "1:997089945771:web:55496eb4fb702eabce2fee"
+    };    
 
-    <div id="debug" class="debug-info"></div>
-    <div id="liste-retraits"></div>
-    <div id="message" class="message"></div>
+    // Initialisation Firebase
+    const app = initializeApp(firebaseConfig);
+    const database = getDatabase(app);
+    const auth = getAuth(app);
 
-    <script type="module">
-        import { initializeApp } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-app.js";
-        import { getDatabase, ref, onValue, update } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-database.js";
-
-        const firebaseConfig = {
-            apiKey: "AIzaSyBjNLOXq8Xh3dRMJaE6eOHuqq0IXjn413U",
-            authDomain: "trading-86409.firebaseapp.com",
-            databaseURL: "https://trading-86409-default-rtdb.firebaseio.com",
-            projectId: "trading-86409",
-            storageBucket: "trading-86409.firebasestorage.app",
-            messagingSenderId: "886645969622",
-            appId: "1:886645969622:web:e3be0c80f5ee1e7ff82f77"
-        };
-
-        const app = initializeApp(firebaseConfig);
-        const db = getDatabase();
-
-        let tousLesRetraits = [];
-
-        function afficherDebug(message) {
-            const debug = document.getElementById('debug');
-            debug.innerHTML += `<div>${message}</div>`;
+    // Gestionnaire d'utilisateurs
+    class UserManager {
+        /**
+         * Charge tous les utilisateurs depuis la base de données
+         */
+        static async loadUsers() {
+            const usersRef = ref(database, 'users');
+            onValue(usersRef, (snapshot) => {
+                const userTable = document.getElementById('userTable');
+                userTable.innerHTML = '';
+                
+                snapshot.forEach((userSnapshot) => {
+                    const userData = userSnapshot.val();
+                    if (userData.email) {
+                        this.addUserToTable(userData);
+                    }
+                });
+            });
         }
 
-        function mettreAJourStatistiques(retraits) {
-            const totalRetraits = document.getElementById('total-retraits');
-            const montantTotal = document.getElementById('montant-total');
-            const retraitsPeriode = document.getElementById('retraits-periode');
-
-            const total = tousLesRetraits.length;
-            const somme = tousLesRetraits.reduce((acc, retrait) => acc + (parseFloat(retrait.amount) || 0), 0);
-            const nombrePeriode = retraits.length;
-
-            totalRetraits.textContent = total;
-            montantTotal.textContent = `${somme.toFixed(2)} €`;
-            retraitsPeriode.textContent = nombrePeriode;
-        }
-
-        function chargerRetraits() {
-            const container = document.getElementById('liste-retraits');
+        /**
+         * Ajoute un utilisateur au tableau HTML
+         * @param {Object} userData - Les données de l'utilisateur
+         */
+        static addUserToTable(userData) {
+            const userTable = document.getElementById('userTable');
+            const row = document.createElement('tr');
+            row.classList.toggle('disabled-user', userData.isDisabled);
+            row.innerHTML = `
+                <td>${userData.email || 'N/A'}</td>
+                <td>${userData.balance || 0}</td>
+                <td>${userData.isDisabled ? 'Désactivé' : 'Actif'}</td>
+                <td>
+                    <button class="edit-btn" data-email="${userData.email}" data-balance="${userData.balance || 0}">
+                        Modifier
+                    </button>
+                </td>
+            `;
             
-            onValue(ref(db, 'users'), (snapshot) => {
-                container.innerHTML = '';
-                document.getElementById('debug').innerHTML = '';
-                tousLesRetraits = [];
-                
-                afficherDebug('Connexion à Firebase réussie');
-                
-                if (snapshot.exists()) {
-                    afficherDebug('Données trouvées dans users');
-                    
-                    snapshot.forEach((userSnapshot) => {
-                        const userData = userSnapshot.val();
-                        const userId = userSnapshot.key;
-                        
-                        if (userData.withdrawals) {
-                            Object.entries(userData.withdrawals).forEach(([retraitId, retrait]) => {
-                                retrait.userId = userId;
-                                retrait.retraitId = retraitId;
-                                retrait.username = userData.username || userData.email || 'Utilisateur sans nom';
-                                tousLesRetraits.push(retrait);
-                            });
-                        }
-                    });
-
-                    filtrerRetraits();
-                } else {
-                    afficherDebug('Aucune donnée trouvée dans users');
-                    container.innerHTML = '<div class="retrait">Aucune donnée trouvée</div>';
-                    mettreAJourStatistiques([]);
-                }
-            }, (error) => {
-                afficherDebug(`Erreur de connexion: ${error.message}`);
-                console.error('Erreur:', error);
+            // Ajouter un gestionnaire d'événements pour le bouton de modification
+            const editBtn = row.querySelector('.edit-btn');
+            editBtn.addEventListener('click', () => {
+                this.prepareEdit(userData.email, userData.balance || 0);
             });
+            
+            userTable.appendChild(row);
         }
 
-        window.filtrerRetraits = function() {
-            const dateDebut = document.getElementById('date-debut').value;
-            const dateFin = document.getElementById('date-fin').value;
-            const container = document.getElementById('liste-retraits');
-            container.innerHTML = '';
-
-            let retraitsFiltres = [...tousLesRetraits];
-
-            if (dateDebut) {
-                const debutTimestamp = new Date(dateDebut).getTime();
-                retraitsFiltres = retraitsFiltres.filter(retrait => 
-                    new Date(retrait.timestamp).getTime() >= debutTimestamp
-                );
-            }
-
-            if (dateFin) {
-                const finTimestamp = new Date(dateFin).setHours(23, 59, 59, 999);
-                retraitsFiltres = retraitsFiltres.filter(retrait => 
-                    new Date(retrait.timestamp).getTime() <= finTimestamp
-                );
-            }
-
-            retraitsFiltres.forEach(retrait => {
-                const element = document.createElement('div');
-                element.className = 'retrait';
-                
-                element.innerHTML = `
-                    <div class="info-user">
-                        <strong>${retrait.username}</strong>
-                        <span class="en-attente">${retrait.status || 'Status inconnu'}</span>
-                    </div>
-                    
-                    <div class="montant">${retrait.amount || 0} €</div>
-                    
-                    <div class="details">
-                        <div class="detail">📱 Opérateur: ${retrait.operator || 'Non spécifié'}</div>
-                        <div class="detail">📞 Téléphone: ${retrait.phone || 'Non spécifié'}</div>
-                        <div class="detail">💰 Frais: ${retrait.fees || 0} €</div>
-                        <div class="detail">💶 Total: ${retrait.totalAmount || 0} €</div>
-                        <div class="detail">🕒 Date: ${retrait.timestamp ? new Date(retrait.timestamp).toLocaleString() : 'Non spécifié'}</div>
-                    </div>
-
-                    <div class="boutons">
-                        <button 
-                            class="btn btn-approuver" 
-                            onclick="window.mettreAJourStatut('${retrait.userId}', '${retrait.retraitId}', 'Approuvé')">
-                            APPROUVER
-                        </button>
-                        <button 
-                            class="btn btn-rejeter" 
-                            onclick="window.mettreAJourStatut('${retrait.userId}', '${retrait.retraitId}', 'Rejeté')">
-                            REJETER
-                        </button>
-                    </div>
-                `;
-                
-                container.appendChild(element);
-            });
-
-            mettreAJourStatistiques(retraitsFiltres);
+        /**
+         * Prépare le formulaire d'édition pour un utilisateur
+         * @param {string} email - L'email de l'utilisateur
+         * @param {number} currentBalance - Le solde actuel
+         */
+        static prepareEdit(email, currentBalance) {
+            document.getElementById('userIdInput').value = email;
+            document.getElementById('balanceInput').value = currentBalance;
         }
 
-        window.reinitialiserFiltres = function() {
-            document.getElementById('date-debut').value = '';
-            document.getElementById('date-fin').value = '';
-            filtrerRetraits();
-        }
-
-        window.mettreAJourStatut = async function(userId, retraitId, nouveauStatut) {
+        /**
+         * Met à jour le solde d'un utilisateur
+         */
+        static async updateBalance() {
+            const userEmail = document.getElementById('userIdInput').value;
+            const newBalance = parseFloat(document.getElementById('balanceInput').value);
+            
             try {
-                const updates = {};
-                updates[`/users/${userId}/withdrawals/${retraitId}/status`] = nouveauStatut;
-                
-                await update(ref(db), updates);
-                afficherDebug(`Statut mis à jour: ${nouveauStatut}`);
-                
+                await this.validateAndUpdate(userEmail, newBalance);
+                this.showMessage('Solde mis à jour avec succès!', 'success');
             } catch (error) {
-                afficherDebug(`Erreur de mise à jour: ${error.message}`);
-                console.error("Erreur:", error);
+                this.showMessage(error.message, 'error');
             }
         }
 
-        // Démarrer le chargement
-        chargerRetraits();
-    </script>
+        /**
+         * Valide et met à jour le solde d'un utilisateur
+         * @param {string} userEmail - L'email de l'utilisateur
+         * @param {number} newBalance - Le nouveau solde
+         */
+        static async validateAndUpdate(userEmail, newBalance) {
+            if (!userEmail || isNaN(newBalance)) {
+                throw new Error('Veuillez remplir tous les champs correctement.');
+            }
+
+            const usersRef = ref(database, 'users');
+            const userQuery = query(usersRef, orderByChild('email'), equalTo(userEmail));
+            const snapshot = await get(userQuery);
+
+            if (!snapshot.exists()) {
+                throw new Error('Utilisateur non trouvé');
+            }
+
+            let userId = null;
+            snapshot.forEach((childSnapshot) => {
+                userId = childSnapshot.key;
+            });
+            
+            if (userId) {
+                const userRef = ref(database, `users/${userId}`);
+                await update(userRef, { balance: newBalance });
+            }
+        }
+
+        /**
+         * Bascule le statut actif/désactivé d'un utilisateur
+         */
+        static async toggleUserStatus() {
+            const userEmail = document.getElementById('userIdInput').value;
+            
+            try {
+                await this.validateAndToggle(userEmail);
+                this.showMessage('Statut de l\'utilisateur mis à jour!', 'success');
+            } catch (error) {
+                this.showMessage(error.message, 'error');
+            }
+        }
+
+        /**
+         * Valide et bascule le statut d'un utilisateur
+         * @param {string} userEmail - L'email de l'utilisateur
+         */
+        static async validateAndToggle(userEmail) {
+            if (!userEmail) {
+                throw new Error('Veuillez saisir un email.');
+            }
+
+            const usersRef = ref(database, 'users');
+            const userQuery = query(usersRef, orderByChild('email'), equalTo(userEmail));
+            const snapshot = await get(userQuery);
+
+            if (!snapshot.exists()) {
+                throw new Error('Utilisateur non trouvé');
+            }
+
+            let userId = null;
+            let userData = null;
+            
+            snapshot.forEach((childSnapshot) => {
+                userId = childSnapshot.key;
+                userData = childSnapshot.val();
+            });
+            
+            if (userId && userData) {
+                const userRef = ref(database, `users/${userId}`);
+                await update(userRef, {
+                    isDisabled: !userData.isDisabled
+                });
+            }
+        }
+
+        /**
+         * Affiche un message à l'utilisateur
+         * @param {string} message - Le message à afficher
+         * @param {string} type - Le type de message (success/error)
+         */
+        static showMessage(message, type) {
+            const messageDiv = document.getElementById('message');
+            messageDiv.innerHTML = `<p class="${type}">${message}</p>`;
+            setTimeout(() => messageDiv.innerHTML = '', 3000);
+        }
+
+        /**
+         * Filtre les utilisateurs en fonction de la recherche
+         */
+        static filterUsers() {
+            const searchInput = document.getElementById('searchInput').value.toLowerCase();
+            const rows = document.getElementById('userTable').getElementsByTagName('tr');
+            
+            Array.from(rows).forEach(row => {
+                const emailCell = row.cells[0];
+                if (emailCell) {
+                    const emailText = emailCell.textContent.toLowerCase();
+                    row.style.display = emailText.includes(searchInput) ? '' : 'none';
+                }
+            });
+        }
+    }
+
+    // Initialisation des écouteurs d'événements
+    function initEventListeners() {
+        const searchInput = document.getElementById('searchInput');
+        if (searchInput) {
+            searchInput.addEventListener('input', UserManager.filterUsers);
+        }
+        
+        const updateBalanceBtn = document.getElementById('updateBalanceBtn');
+        if (updateBalanceBtn) {
+            updateBalanceBtn.addEventListener('click', UserManager.updateBalance.bind(UserManager));
+        }
+        
+        const toggleStatusBtn = document.getElementById('toggleStatusBtn');
+        if (toggleStatusBtn) {
+            toggleStatusBtn.addEventListener('click', UserManager.toggleUserStatus.bind(UserManager));
+        }
+    }
+
+    // Initialisation de l'application
+    document.addEventListener('DOMContentLoaded', () => {
+        UserManager.loadUsers();
+        initEventListeners();
+    });
+
+    // Exposition des méthodes au scope global pour les appels dans le HTML existant
+    window.UserManager = UserManager;
+    window.filterUsers = () => UserManager.filterUsers();
+    window.updateBalance = () => UserManager.updateBalance();
+    window.toggleUserStatus = () => UserManager.toggleUserStatus();
+    window.prepareEdit = (email, balance) => UserManager.prepareEdit(email, balance);
+</script>
 </body>
 </html>
