@@ -1,0 +1,312 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Approbation des Retraits</title>
+    <style>
+        .debug-info {
+            background: #fff3cd;
+            padding: 10px;
+            margin: 10px 0;
+            border-radius: 4px;
+            font-family: monospace;
+        }
+        .retrait {
+            border: 1px solid #ddd;
+            margin: 10px 0;
+            padding: 15px;
+            border-radius: 8px;
+        }
+        .info-user {
+            display: flex;
+            justify-content: space-between;
+            margin-bottom: 10px;
+        }
+        .en-attente {
+            color: orange;
+        }
+        .montant {
+            font-size: 1.2em;
+            font-weight: bold;
+            margin: 10px 0;
+        }
+        .details {
+            margin: 10px 0;
+        }
+        .detail {
+            margin: 5px 0;
+        }
+        .boutons {
+            display: flex;
+            gap: 10px;
+        }
+        .btn {
+            padding: 8px 16px;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+        }
+        .btn-approuver {
+            background: #28a745;
+            color: white;
+        }
+        .btn-rejeter {
+            background: #dc3545;
+            color: white;
+        }
+        .filtres {
+            background: #f8f9fa;
+            padding: 15px;
+            margin: 15px 0;
+            border-radius: 8px;
+            display: flex;
+            gap: 15px;
+            align-items: center;
+            flex-wrap: wrap;
+        }
+        .filtre-groupe {
+            display: flex;
+            flex-direction: column;
+            gap: 5px;
+        }
+        .filtre-groupe label {
+            font-weight: bold;
+            font-size: 0.9em;
+        }
+        input[type="date"] {
+            padding: 8px;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+        }
+        .btn-filtre {
+            background: #0d6efd;
+            color: white;
+            height: fit-content;
+            align-self: flex-end;
+        }
+        .stats {
+            background: #e9ecef;
+            padding: 15px;
+            margin: 15px 0;
+            border-radius: 8px;
+            display: flex;
+            gap: 20px;
+        }
+        .stat-item {
+            flex: 1;
+            text-align: center;
+        }
+        .stat-valeur {
+            font-size: 1.5em;
+            font-weight: bold;
+            color: #0d6efd;
+        }
+        .stat-label {
+            font-size: 0.9em;
+            color: #6c757d;
+        }
+    </style>
+</head>
+<body>
+    <div class="header">
+        <h1>Demandes de Retrait</h1>
+    </div>
+
+    <div class="filtres">
+        <div class="filtre-groupe">
+            <label>Date de début</label>
+            <input type="date" id="date-debut" onchange="filtrerRetraits()">
+        </div>
+        <div class="filtre-groupe">
+            <label>Date de fin</label>
+            <input type="date" id="date-fin" onchange="filtrerRetraits()">
+        </div>
+        <button class="btn btn-filtre" onclick="reinitialiserFiltres()">
+            Réinitialiser les filtres
+        </button>
+    </div>
+
+    <div class="stats">
+        <div class="stat-item">
+            <div class="stat-valeur" id="total-retraits">0</div>
+            <div class="stat-label">Total des retraits</div>
+        </div>
+        <div class="stat-item">
+            <div class="stat-valeur" id="montant-total">0 €</div>
+            <div class="stat-label">Montant total</div>
+        </div>
+        <div class="stat-item">
+            <div class="stat-valeur" id="retraits-periode">0</div>
+            <div class="stat-label">Retraits sur la période</div>
+        </div>
+    </div>
+
+    <div id="debug" class="debug-info"></div>
+    <div id="liste-retraits"></div>
+    <div id="message" class="message"></div>
+
+    <script type="module">
+        import { initializeApp } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-app.js";
+        import { getDatabase, ref, onValue, update } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-database.js";
+
+        const firebaseConfig = {
+            apiKey: "AIzaSyBjNLOXq8Xh3dRMJaE6eOHuqq0IXjn413U",
+            authDomain: "trading-86409.firebaseapp.com",
+            databaseURL: "https://trading-86409-default-rtdb.firebaseio.com",
+            projectId: "trading-86409",
+            storageBucket: "trading-86409.firebasestorage.app",
+            messagingSenderId: "886645969622",
+            appId: "1:886645969622:web:e3be0c80f5ee1e7ff82f77"
+        };
+
+        const app = initializeApp(firebaseConfig);
+        const db = getDatabase();
+
+        let tousLesRetraits = [];
+
+        function afficherDebug(message) {
+            const debug = document.getElementById('debug');
+            debug.innerHTML += `<div>${message}</div>`;
+        }
+
+        function mettreAJourStatistiques(retraits) {
+            const totalRetraits = document.getElementById('total-retraits');
+            const montantTotal = document.getElementById('montant-total');
+            const retraitsPeriode = document.getElementById('retraits-periode');
+
+            const total = tousLesRetraits.length;
+            const somme = tousLesRetraits.reduce((acc, retrait) => acc + (parseFloat(retrait.amount) || 0), 0);
+            const nombrePeriode = retraits.length;
+
+            totalRetraits.textContent = total;
+            montantTotal.textContent = `${somme.toFixed(2)} €`;
+            retraitsPeriode.textContent = nombrePeriode;
+        }
+
+        function chargerRetraits() {
+            const container = document.getElementById('liste-retraits');
+            
+            onValue(ref(db, 'users'), (snapshot) => {
+                container.innerHTML = '';
+                document.getElementById('debug').innerHTML = '';
+                tousLesRetraits = [];
+                
+                afficherDebug('Connexion à Firebase réussie');
+                
+                if (snapshot.exists()) {
+                    afficherDebug('Données trouvées dans users');
+                    
+                    snapshot.forEach((userSnapshot) => {
+                        const userData = userSnapshot.val();
+                        const userId = userSnapshot.key;
+                        
+                        if (userData.withdrawals) {
+                            Object.entries(userData.withdrawals).forEach(([retraitId, retrait]) => {
+                                retrait.userId = userId;
+                                retrait.retraitId = retraitId;
+                                retrait.username = userData.username || userData.email || 'Utilisateur sans nom';
+                                tousLesRetraits.push(retrait);
+                            });
+                        }
+                    });
+
+                    filtrerRetraits();
+                } else {
+                    afficherDebug('Aucune donnée trouvée dans users');
+                    container.innerHTML = '<div class="retrait">Aucune donnée trouvée</div>';
+                    mettreAJourStatistiques([]);
+                }
+            }, (error) => {
+                afficherDebug(`Erreur de connexion: ${error.message}`);
+                console.error('Erreur:', error);
+            });
+        }
+
+        window.filtrerRetraits = function() {
+            const dateDebut = document.getElementById('date-debut').value;
+            const dateFin = document.getElementById('date-fin').value;
+            const container = document.getElementById('liste-retraits');
+            container.innerHTML = '';
+
+            let retraitsFiltres = [...tousLesRetraits];
+
+            if (dateDebut) {
+                const debutTimestamp = new Date(dateDebut).getTime();
+                retraitsFiltres = retraitsFiltres.filter(retrait => 
+                    new Date(retrait.timestamp).getTime() >= debutTimestamp
+                );
+            }
+
+            if (dateFin) {
+                const finTimestamp = new Date(dateFin).setHours(23, 59, 59, 999);
+                retraitsFiltres = retraitsFiltres.filter(retrait => 
+                    new Date(retrait.timestamp).getTime() <= finTimestamp
+                );
+            }
+
+            retraitsFiltres.forEach(retrait => {
+                const element = document.createElement('div');
+                element.className = 'retrait';
+                
+                element.innerHTML = `
+                    <div class="info-user">
+                        <strong>${retrait.username}</strong>
+                        <span class="en-attente">${retrait.status || 'Status inconnu'}</span>
+                    </div>
+                    
+                    <div class="montant">${retrait.amount || 0} €</div>
+                    
+                    <div class="details">
+                        <div class="detail">📱 Opérateur: ${retrait.operator || 'Non spécifié'}</div>
+                        <div class="detail">📞 Téléphone: ${retrait.phone || 'Non spécifié'}</div>
+                        <div class="detail">💰 Frais: ${retrait.fees || 0} €</div>
+                        <div class="detail">💶 Total: ${retrait.totalAmount || 0} €</div>
+                        <div class="detail">🕒 Date: ${retrait.timestamp ? new Date(retrait.timestamp).toLocaleString() : 'Non spécifié'}</div>
+                    </div>
+
+                    <div class="boutons">
+                        <button 
+                            class="btn btn-approuver" 
+                            onclick="window.mettreAJourStatut('${retrait.userId}', '${retrait.retraitId}', 'Approuvé')">
+                            APPROUVER
+                        </button>
+                        <button 
+                            class="btn btn-rejeter" 
+                            onclick="window.mettreAJourStatut('${retrait.userId}', '${retrait.retraitId}', 'Rejeté')">
+                            REJETER
+                        </button>
+                    </div>
+                `;
+                
+                container.appendChild(element);
+            });
+
+            mettreAJourStatistiques(retraitsFiltres);
+        }
+
+        window.reinitialiserFiltres = function() {
+            document.getElementById('date-debut').value = '';
+            document.getElementById('date-fin').value = '';
+            filtrerRetraits();
+        }
+
+        window.mettreAJourStatut = async function(userId, retraitId, nouveauStatut) {
+            try {
+                const updates = {};
+                updates[`/users/${userId}/withdrawals/${retraitId}/status`] = nouveauStatut;
+                
+                await update(ref(db), updates);
+                afficherDebug(`Statut mis à jour: ${nouveauStatut}`);
+                
+            } catch (error) {
+                afficherDebug(`Erreur de mise à jour: ${error.message}`);
+                console.error("Erreur:", error);
+            }
+        }
+
+        // Démarrer le chargement
+        chargerRetraits();
+    </script>
+</body>
+</html>
